@@ -37,8 +37,8 @@ git config user.name "emoji-collector"
 git config user.email "emoji-collector@users.noreply.github.com"
 
 git add .
-git commit -m "init emoji collector"
-if errorlevel 1 goto :fail
+git commit -m "init emoji collector" >nul 2>&1
+echo 已检查本地提交（没有新改动也会继续推送）。
 
 git branch -M main
 git remote remove origin 2>nul

@@ -30,7 +30,7 @@ jobs:
           # 进一步减少 Actions 分钟数和依赖风险。
 
       - name: Collect and generate report
-        run: python scripts/collect.py --top 30 --keep-days 30
+        run: python scripts/collect.py --top 60 --keep-days 180
 
       - name: Commit report
         run: |

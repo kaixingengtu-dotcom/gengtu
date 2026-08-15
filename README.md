@@ -1,9 +1,22 @@
 # 每日热门表情包采集器（低成本版）
 
-一个使用 **GitHub Actions + Python 标准库** 的每日中文热门表情包采集器。
+一个使用 **GitHub Actions + Python 标准库** 的每日热门表情包采集器。
+
+- **当前只采集微信公众号**：通过搜狗微信搜索公众号发的热门表情包/GIF 文章。
+- **一站式主页**：打开 `http://localhost:8765/` 一个页面就能看到“最近热门梗 + 搜索框 + 最新表情墙 + 最近日报”。
+- **最近热门梗**：基于最近 90 天数据识别被多个公众号反复引用的梗名，最多显示 12 个；真实热门梗不足时自动用常见热门梗关键词补足，点击梗名会自动联网搜索。
+- **联网搜索**：输入关键词按回车或点“联网搜索”，实时搜索微信公众号文章，不再只搜本地旧数据。
+- **老梗搜索页**：`docs/search.html` 仍保留，可单独搜索历史日报。
+- **DeepSeek 风格网页**：所有页面都带 DeepSeek 品牌元素。
+- **小红书、抖音暂不采集**：没有公开表情包接口，直接抓取需要登录/风控/商业 API。
+- 其他表情包站（斗图啦、Reddit、微博、贴吧等）已**全部排除**，因为它们的内容偏老。
+
+> 如果你之后能提供小红书/抖音的 Cookie 或 API，我可以再接入。
+
+特点：
 
 - **不调用任何 AI/LLM API**，因此没有 Token 费用。
-- **不下载原图入库**，只生成 Markdown/JSON 外链清单，GitHub 存储占用极小。
+- **不下载原图入库**，只生成 Markdown/JSON/HTML 外链清单，GitHub 和本地存储占用极小。
 - **只在需要时**用本地脚本下载图片到你的电脑。
 - 数据源为“最佳努力”模式：某个网站挂了/改版，不影响其他源。
 
@@ -23,9 +36,11 @@
 ```
 .
 ├── .github/workflows/daily-emoji.yml   # 每天定时任务
+├── server.py                           # 本地网页服务器 + 联网搜索 API
 ├── scripts/
 │   ├── collect.py                      # 采集 + 生成日报（Actions 中运行）
-│   └── download_selected.py            # 本地按需下载图片（手动运行）
+│   ├── download_selected.py            # 本地按需下载图片（手动运行）
+│   └── cleanup_downloads.py            # 定期清理下载的旧图片
 ├── data/                               # 生成的结构化 JSON
 ├── docs/                               # 生成的网页/日报（看这里）
 ├── downloads/                          # 本地下载目录（已被 gitignore）
@@ -67,7 +82,7 @@ git push -u origin main
 运行完成后，在仓库里打开：
 
 - **`docs/index.html`** ← 这是入口，点日期就能看当天的表情墙
-- `docs/2025-01-01.html` ← 某一天的完整表情墙，图片一排排展示
+- `docs/2025-01-01.html` ← 某一天的完整表情墙，最上面有“今日推荐”总结和 Top 3
 
 如果你想更方便，可以开启 **GitHub Pages**：
 1. 仓库页面 → **Settings** → **Pages**
@@ -94,16 +109,57 @@ python scripts/download_selected.py data/2025-01-01.json --output ./downloads --
 
 下载的图片在 `downloads/`，不会提交到 GitHub。
 
+## 本地访问方式
+
+- 直接双击打开文件：`C:\deepseek\emoji-collector\docs\index.html`
+- 更推荐用本地网址访问：双击 **`启动本地网页.bat`**，然后浏览器打开：
+  ```
+  http://localhost:8765/
+  ```
+  一个页面里就有：最近热门梗、搜索框、最新表情墙、最近日报。
+  关闭那个黑色窗口即可停止服务。
+- 老梗搜索页（备用）：
+  ```
+  http://localhost:8765/search.html
+  ```
+- **联网搜索**必须通过 `启动本地网页.bat` 启动（运行 `server.py`），直接双击 HTML 文件只能搜本地历史。
+
+## 本地资源占用与清理
+
+**默认情况下图片不占本地资源**：
+- 日报里的图片都是**外链**，没有下载到本地，只保存文字链接。
+- 只有你主动运行下载脚本后，图片才会出现在 `downloads/`。
+
+**定期清理**：
+
+- 日报文件（`data/`、`docs/`）会自动只保留最近 `--keep-days 180` 天，旧的自动删除。
+- 下载到本地的图片可以用清理脚本删除超过 N 天的文件：
+  ```bash
+  # 删除 downloads/ 里超过 30 天的图片
+  python scripts/cleanup_downloads.py --days 30
+
+  # 删除超过 7 天的
+  python scripts/cleanup_downloads.py --days 7
+  ```
+
 ## 当前数据源
 
 | 源 | 方式 | 说明 |
 | --- | --- | --- |
-| 微博 | 移动端搜索 JSON | 搜“表情包”，按互动量给热度分，尽量取新内容 |
-| 发表情 | 热门列表页解析 | 图片外链 |
-| 斗图啦 | 文章/图片列表页解析 | 图片外链 |
-| 贴吧 | “表情包”吧帖子列表 | 目前可能没有封面图，后续可增强 |
-| 逗逼表情包 | 公开搜索接口 | 尽力而为 |
-| Reddit（可选） | r/memes hot.json | 默认不启用；GitHub 官方 runner 访问国内源失败时可作外网兜底 |
+| 搜狗微信 | 搜索 10 组表情包关键词 | **公众号表情文章**，每天约 60 条带图结果 |
+
+> 已排除：斗图啦、Reddit、微博、发表情、贴吧、逗逼表情包。
+
+**关于排序**：搜狗微信不直接提供“阅读量/点赞数”，公众号文章页也有反爬，所以拿不到真实阅读量。  
+当前使用**综合热度分**从高到低排序：  
+- 同一篇文章被多个关键词搜到 → 加分  
+- 在搜索结果中排得越靠前 → 加分  
+- 发布越新 → 加分
+
+**关于老梗/二创**：很多热门表情包是“老梗新做”，比如“草地牛”火了很久但一直有新公众号发。  
+日报会额外识别**今日热门梗**：从标题里找出被多个不同公众号反复提到的具体名字，按出现篇数展示。  
+这样你能一眼看到“哪个梗今天被引用最多”，而不是只看单篇文章新旧。  
+如果当天没有明显重复的梗名，会显示“暂无明显重复梗”，不会硬凑。
 
 某些站点有反爬/改版风险。如果某天某个源失败，脚本会自动跳过，不影响日报生成。
 
@@ -113,19 +169,17 @@ python scripts/download_selected.py data/2025-01-01.json --output ./downloads --
 
 ## 自定义
 
-- 改抓取数量：编辑 workflow 中 `--top 30`。
-- 改保留天数：编辑 `--keep-days 30`。
-- 禁用不稳定的源：
+- 默认只采集：搜狗微信（微信公众号）。
+- 改抓取数量：编辑 workflow 中 `--top 60`。
+- 改保留天数：编辑 `--keep-days 180`。
+- 过滤太旧的内容（默认不过滤，但新的会排在前面）：
   ```bash
-  python scripts/collect.py --sources weibo,fabiaoqing
+  # 只保留最近 90 天
+  python scripts/collect.py --max-age-days 90
   ```
-- 启用 Reddit 外网兜底：
+- 如果以后想临时加回其他源：
   ```bash
-  python scripts/collect.py --sources weibo,fabiaoqing,doutu,tieba,dbbqb,reddit
-  ```
-  如需在 GitHub Actions 中也启用，可修改 workflow 里的命令：
-  ```bash
-  python scripts/collect.py --top 30 --keep-days 30 --sources weibo,fabiaoqing,doutu,tieba,dbbqb,reddit
+  python scripts/collect.py --sources sogou_weixin,doutu
   ```
 - 新增数据源：在 `scripts/collect.py` 的 `SOURCES` 字典里加一个函数即可。
 

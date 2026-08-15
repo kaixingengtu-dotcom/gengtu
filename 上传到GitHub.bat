@@ -6,7 +6,6 @@ where git >nul 2>nul
 if errorlevel 1 (
     echo [错误] 没有检测到 Git，请先安装 Git。
     echo 下载地址：https://git-scm.com/download/win
-    echo 安装完成后，再重新双击本脚本。
     pause
     exit /b 1
 )
@@ -32,15 +31,40 @@ if "%REPO%"=="" (
 echo.
 echo 正在初始化并推送...
 git init
+if errorlevel 1 goto :fail
+
 git config user.name "emoji-collector"
 git config user.email "emoji-collector@users.noreply.github.com"
+
 git add .
 git commit -m "init emoji collector"
+if errorlevel 1 goto :fail
+
 git branch -M main
 git remote remove origin 2>nul
 git remote add origin "%REPO%"
+
+echo.
+echo 正在推送到 GitHub，请稍等...
 git push -u origin main
+if errorlevel 1 goto :fail
 
 echo.
 echo 完成！请打开 GitHub 仓库页面，进入 Actions 手动运行一次。
 pause
+exit /b 0
+
+:fail
+echo.
+echo [失败] 上传没有成功，请仔细看上面的红色错误信息。
+echo.
+echo 常见原因：
+echo   1. 令牌 Token 没有勾选 workflow 权限（必须勾选 repo 和 workflow）
+echo   2. 令牌 Token 已过期或复制少了字符
+echo   3. 网络无法连接 GitHub
+echo.
+echo 如果错误里提到 workflow，请重新生成 Token：
+echo   https://github.com/settings/tokens
+echo   生成时一定要勾选：repo 和 workflow
+pause
+exit /b 1
